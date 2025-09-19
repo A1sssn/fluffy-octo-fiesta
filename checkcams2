@@ -1,0 +1,30 @@
+import cv2
+
+def find_all_working_cameras():
+    """
+    Tests a range of camera indices and returns a list of all working camera indices.
+    """
+    working_cameras = []
+    # Test up to a reasonable number of camera indices.
+    # You can adjust this range if you have more cameras.
+    for i in range(10): 
+        cap = cv2.VideoCapture(i)
+        if cap.isOpened():
+            working_cameras.append(i)
+            print(f"Success: Camera found at index {i}")
+            cap.release()
+        else:
+            print(f"Failure: Could not open camera at index {i}")
+            # Release the capture object even if it's not opened to be safe.
+            cap.release()
+
+    return working_cameras
+
+if __name__ == "__main__":
+    found_indices = find_all_working_cameras()
+    if found_indices:
+        print("\nFound the following working camera indices:")
+        for index in found_indices:
+            print(f"- Camera index: {index}")
+    else:
+        print("\nNo working cameras were found. Please ensure your camera is connected and drivers are installed.")
