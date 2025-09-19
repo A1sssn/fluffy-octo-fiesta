@@ -1,0 +1,29 @@
+import cv2
+
+def find_working_camera_index():
+    """
+    Tests camera indices from 0 up to 9 and returns the first one that works.
+    Returns None if no working camera is found.
+    """
+    for i in range(10):
+        try:
+            cap = cv2.VideoCapture(i)
+            if cap.isOpened():
+                print(f"Success: Camera found at index {i}")
+                cap.release()
+                return i
+            else:
+                print(f"Failure: Could not open camera at index {i}")
+                cap.release()
+        except Exception as e:
+            print(f"An error occurred while checking index {i}: {e}")
+    
+    print("No working camera could be found.")
+    return None
+
+if __name__ == "__main__":
+    found_index = find_working_camera_index()
+    if found_index is not None:
+        print(f"The first working camera is at index: {found_index}")
+    else:
+        print("Please ensure your camera is connected and drivers are installed.")
