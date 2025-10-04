@@ -1,0 +1,44 @@
+def gen_frames():
+    """Video streaming generator function."""
+    camera = get_video_stream()
+    if camera is None:
+        print("Camera not available. Stopping frame generation.")
+        return
+
+    while True:
+        success, frame = camera.read()
+        if not success:
+            print("Failed to read frame from camera. Reinitializing...")
+            camera.release()
+            cap = None  # reset global camera
+            camera = get_video_stream()
+            continue
+
+        results = model(frame, verbose=False)
+
+        #  Prevent index errors - ensure results and boxes exist
+        if not results or len(results) == 0 or results[0].boxes is None:
+            labels = []
+        else:
+            labels = [model.names[int(cls)] for cls in results[0].boxes.cls]
+
+        is_traffic = any(label in traffic_classes for label in labels)
+        label_text = "Traffic Detected" if is_traffic else "No Traffic"
+        color = (0, 255, 0) if is_traffic else (0, 0, 255)
+        cv2.putText(frame, label_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
+
+        #  Only draw boxes when available
+        if results and len(results) > 0:
+            for box, cls_id in zip(results[0].boxes.xyxy, results[0].boxes.cls):
+                x1, y1, x2, y2 = map(int, box)
+                cls_name = model.names[int(cls_id)]
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
+                cv2.putText(frame, cls_name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+
+        ret, buffer = cv2.imencode('.jpg', frame)
+        if not ret:
+            print("Failed to encode frame.")
+            break
+        frame_bytes = buffer.tobytes()
+        yield (b'--frame\r\n'
+               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
