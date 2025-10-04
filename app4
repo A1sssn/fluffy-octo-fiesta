@@ -15,23 +15,29 @@ traffic_classes = ['car', 'bus', 'truck', 'motorcycle', 'traffic light', 'stop s
 cap = None
 
 def get_video_stream():
-    """
-    Initializes and returns the VideoCapture object.
-    This function is called only when the app is running in the main process.
-    """
     global cap
     if cap is None:
-        cap = cv2.VideoCapture(0, cv2.CAP_V4L2)  # Use V4L2 backend for Raspberry Pi
+        # Try default first
+        cap = cv2.VideoCapture(0)
 
-        #  Force Logitech C310 into 720p MJPG mode (more reliable on RPi)
+        if not cap.isOpened():
+            print("Default index 0 failed. Trying /dev/video0 ...")
+            cap = cv2.VideoCapture('/dev/video0')
+
+        if not cap.isOpened():
+            print("Direct path failed. Trying V4L2 with /dev/video0 ...")
+            cap = cv2.VideoCapture('/dev/video0', cv2.CAP_V4L2)
+
+        if not cap.isOpened():
+            print("Error: Could not open camera at all.")
+            cap = None
+            return None
+
+        # ✅ Force Logitech settings after it successfully opens
         cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
         cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
-        if not cap.isOpened():
-            print("Error: Could not open camera.")
-            cap = None
-            return None
     return cap
 
 @app.route('/')
