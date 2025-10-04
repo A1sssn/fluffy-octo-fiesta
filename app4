@@ -21,10 +21,16 @@ def get_video_stream():
     """
     global cap
     if cap is None:
-        cap = cv2.VideoCapture(0)
-        # Check if the camera opened successfully
+        cap = cv2.VideoCapture(0, cv2.CAP_V4L2)  # Use V4L2 backend for Raspberry Pi
+
+        #  Force Logitech C310 into 720p MJPG mode (more reliable on RPi)
+        cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
+
         if not cap.isOpened():
             print("Error: Could not open camera.")
+            cap = None
             return None
     return cap
 
@@ -35,6 +41,7 @@ def index():
 
 def gen_frames():
     """Video streaming generator function."""
+    global cap
     camera = get_video_stream()
     if camera is None:
         print("Camera not available. Stopping frame generation.")
@@ -43,28 +50,41 @@ def gen_frames():
     while True:
         success, frame = camera.read()
         if not success:
-            print("Failed to read frame from camera.")
-            break
+            print("Failed to read frame from camera. Reinitializing...")
+            camera.release()
+            cap = None  # reset global camera
+            camera = get_video_stream()
+            continue
 
+        #  YOLO inference
         results = model(frame, verbose=False)
-        labels = [model.names[int(cls)] for cls in results[0].boxes.cls]
 
+        #  Safety: handle no detections
+        if not results or len(results) == 0 or results[0].boxes is None:
+            labels = []
+        else:
+            labels = [model.names[int(cls)] for cls in results[0].boxes.cls]
+
+        #  Traffic detection flag
         is_traffic = any(label in traffic_classes for label in labels)
         label_text = "Traffic Detected" if is_traffic else "No Traffic"
         color = (0, 255, 0) if is_traffic else (0, 0, 255)
         cv2.putText(frame, label_text, (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, color, 2)
 
-        # Draw bounding boxes
-        for box, cls_id in zip(results[0].boxes.xyxy, results[0].boxes.cls):
-            x1, y1, x2, y2 = map(int, box)
-            cls_name = model.names[int(cls_id)]
-            cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
-            cv2.putText(frame, cls_name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
+        #  Draw bounding boxes only if detections exist
+        if results and len(results) > 0 and results[0].boxes is not None:
+            for box, cls_id in zip(results[0].boxes.xyxy, results[0].boxes.cls):
+                x1, y1, x2, y2 = map(int, box)
+                cls_name = model.names[int(cls_id)]
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (255, 255, 0), 2)
+                cv2.putText(frame, cls_name, (x1, y1 - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 0), 2)
 
+        #  Encode frame to JPEG
         ret, buffer = cv2.imencode('.jpg', frame)
         if not ret:
             print("Failed to encode frame.")
             break
+
         frame_bytes = buffer.tobytes()
         yield (b'--frame\r\n'
                b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
