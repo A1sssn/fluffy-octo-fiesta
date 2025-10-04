@@ -1,8 +1,22 @@
-python3 - << 'EOF'
+# test_cam.py
 import cv2
-cap = cv2.VideoCapture(0)
+
+cap = cv2.VideoCapture(0)  # try 0, or '/dev/video0' if necessary
 print("Opened:", cap.isOpened())
+
+if not cap.isOpened():
+    cap = cv2.VideoCapture('/dev/video0')
+    print("Tried /dev/video0 -> Opened:", cap.isOpened())
+
+# Optionally set properties (useful for Logitech C310 on RPi)
+cap.set(cv2.CAP_PROP_FOURCC, cv2.VideoWriter_fourcc(*'MJPG'))
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+
 ret, frame = cap.read()
-print("Frame:", ret, "Shape:", frame.shape if ret else "None")
+print("Frame read:", ret)
+if ret:
+    print("Shape:", frame.shape)
+    cv2.imwrite('test_frame.jpg', frame)
+    print("Saved test_frame.jpg")
 cap.release()
-EOF
