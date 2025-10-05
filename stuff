@@ -1,0 +1,11 @@
+[Unit]
+Description=Single-Process Flask Application (app.py)
+After=network.target
+[Service]
+User=pi
+Group=pi
+WorkingDirectory=/home/pi/project
+ExecStart=/home/pi/project/yolo-env/bin/python app.py
+Restart=always
+[Install]
+WantedBy=multi-user.target
